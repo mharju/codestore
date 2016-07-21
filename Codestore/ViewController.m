@@ -8,9 +8,15 @@
 
 #import "ViewController.h"
 
+@import LocalAuthentication;
+
+NSString* kLastAuthentication = @"LastSuccessfulAuthentication";
+const NSTimeInterval kAuthenticationDelay = 15;
+
 @interface ViewController () <UITextFieldDelegate>
 @property (weak, nonatomic) IBOutlet UITextField *codeInputField;
 @property (weak, nonatomic) IBOutlet UILabel *resultCodeField;
+@property (assign) BOOL isAuthenticating;
 
 @property (strong, nonatomic) NSArray *numbers;
 @end
@@ -28,20 +34,73 @@
         self.numbers = [text componentsSeparatedByString:@"\n"];
     }
     
-    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(didBecomeActive:) name:UIApplicationWillResignActiveNotification object:nil];
-    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(didDeactivate:) name:UIApplicationDidBecomeActiveNotification object:nil];
+    [self authenticateIfNeeded];
+
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(willDeactivate:) name:UIApplicationWillResignActiveNotification object:nil];
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(didBecomeActive:) name:UIApplicationDidBecomeActiveNotification object:nil];
 }
 
-- (void) didDeactivate:(NSNotification*)notification
+- (void) willDeactivate:(NSNotification*)notification
 {
     self.codeInputField.text = @"";
+    
+    // XXX Does not clear out the actual password or anything so the user can check it in case it was
+    // forgotten. Is this a good idea or not?
 }
 
 - (void) didBecomeActive:(NSNotification*)notification
 {
     self.codeInputField.text = @"";
     self.resultCodeField.text = @"";
-    [self.codeInputField becomeFirstResponder];
+    
+    [self authenticateIfNeeded];
+}
+
+- (void)authenticateIfNeeded
+{
+    if(!self.isAuthenticating && [self canEvaluatePolicy]) {
+        NSDate* date = [[[NSUserDefaults standardUserDefaults] objectForKey:kLastAuthentication] dateByAddingTimeInterval:kAuthenticationDelay];
+        NSDate* now = [NSDate date];
+        if([date earlierDate:now] == date) {
+            [self evaluatePolicy];
+        } else {
+            [self.codeInputField becomeFirstResponder];
+        }
+    }
+}
+
+- (BOOL)canEvaluatePolicy
+{
+    LAContext *context = [[LAContext alloc] init];
+    return [context canEvaluatePolicy: LAPolicyDeviceOwnerAuthenticationWithBiometrics error:nil];
+}
+
+- (void)evaluatePolicy {
+    NSLog(@"Is authenticating now");
+    self.isAuthenticating = YES;
+
+    LAContext *context = [[LAContext alloc] init];
+
+    // Show the authentication UI with our reason string.
+    [context evaluatePolicy:LAPolicyDeviceOwnerAuthenticationWithBiometrics
+            localizedReason:@"SORMENJÄLKI SIIHEN KU OLIS JO"
+                      reply:^(BOOL success, NSError *authenticationError) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (success) {
+                self.codeInputField.enabled = YES;
+                [self.codeInputField becomeFirstResponder];
+
+                [[NSUserDefaults standardUserDefaults] setObject:[NSDate date] forKey:kLastAuthentication];
+            }
+            else {
+                self.codeInputField.enabled = NO;
+                self.resultCodeField.text = @"NO";
+            }
+
+            self.isAuthenticating = NO;
+            NSLog(@"Authentication completed.");
+        });
+    }];
 }
 
 - (void)didReceiveMemoryWarning {
@@ -51,7 +110,6 @@
 
 - (void) viewDidAppear:(BOOL)animated
 {
-    [self.codeInputField becomeFirstResponder];
 }
 
 - (void) textFieldDidBeginEditing:(UITextField *)textField
