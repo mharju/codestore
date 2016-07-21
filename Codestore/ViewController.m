@@ -30,7 +30,7 @@ const NSTimeInterval kAuthenticationDelay = 15;
     
     NSString *filePath = [[NSBundle mainBundle] pathForResource:@"codes" ofType:@"txt"];
     if (filePath) {
-        NSString *text = [NSString stringWithContentsOfFile:filePath];
+        NSString *text = [NSString stringWithContentsOfFile:filePath encoding:NSUTF8StringEncoding error:nil];
         self.numbers = [text componentsSeparatedByString:@"\n"];
     }
     
