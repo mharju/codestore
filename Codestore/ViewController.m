@@ -83,12 +83,12 @@ const NSTimeInterval kAuthenticationDelay = 15;
 
     // Show the authentication UI with our reason string.
     [context evaluatePolicy:LAPolicyDeviceOwnerAuthenticationWithBiometrics
-            localizedReason:@"SORMENJÄLKI SIIHEN KU OLIS JO"
+            localizedReason:@"Naamanne, jos saan pyytää."
                       reply:^(BOOL success, NSError *authenticationError) {
         dispatch_async(dispatch_get_main_queue(), ^{
             if (success) {
                 self.codeInputField.enabled = YES;
-                [self.codeInputField becomeFirstResponder];
+                [self.codeInputField performSelector:@selector(becomeFirstResponder) withObject:nil afterDelay:0.5];
 
                 [[NSUserDefaults standardUserDefaults] setObject:[NSDate date] forKey:kLastAuthentication];
             }
@@ -110,6 +110,7 @@ const NSTimeInterval kAuthenticationDelay = 15;
 
 - (void) viewDidAppear:(BOOL)animated
 {
+    NSLog(@"Did appear!");
 }
 
 - (void) textFieldDidBeginEditing:(UITextField *)textField
